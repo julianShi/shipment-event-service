@@ -37,21 +37,21 @@ class ShipmentEventsApiTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
-  test "current status follows logical rank while the timeline follows event time" do
+  test "an out-of-order event does not regress status and the timeline remains chronological" do
     post_event(event_payload(
       event_id: "00000000-0000-0000-0000-000000000002",
       shipment_reference: "TV-ORDERING",
       status: "in_transit",
-      event_timestamp: "2026-07-01T10:00:00Z"
+      event_timestamp: "2026-07-03T10:00:00Z"
     ))
     assert_response :created
 
-    # A later timestamp must not make this lower-rank event the current status.
+    # The older timestamp arrives second; current status still follows lifecycle rank.
     post_event(event_payload(
       event_id: "00000000-0000-0000-0000-000000000003",
       shipment_reference: "TV-ORDERING",
       status: "created",
-      event_timestamp: "2026-07-03T10:00:00Z"
+      event_timestamp: "2026-07-01T10:00:00Z"
     ))
     assert_response :created
 
@@ -60,7 +60,7 @@ class ShipmentEventsApiTest < ActionDispatch::IntegrationTest
     body = response_json
     assert_equal "in_transit", body.fetch("current_status")
     assert_equal "determined", body.fetch("status_resolution")
-    assert_equal %w[in_transit created], body.fetch("events").map { |event| event.fetch("status") }
+    assert_equal %w[created in_transit], body.fetch("events").map { |event| event.fetch("status") }
   end
 
   test "a forward lifecycle skip is accepted and derives the furthest status" do

@@ -42,7 +42,7 @@ The primary key supplies the unique event-ID index. Add a unique index on `shipm
 
 ## Replay and verification
 
-A Ruby replay script reads the provided CSV from `../../data/carrier_events.csv` relative to the app root (outside this nested app repository for now); accept a path override so the script is not tied to one working directory. Send events to the local endpoint with bounded concurrency, report sent/duplicate/error counts, and fail on unexpected HTTP errors. After replay, independently deduplicate by event ID, verify each shipment’s returned event IDs and timestamp ordering, and compare current status with the highest logical lifecycle rank. Re-running the replay must not change event counts, timelines, or status.
+A Ruby replay script reads the included CSV from `data/carrier_events.csv` relative to the repository root and accepts a path override for alternate fixtures. Send events to the local endpoint with bounded concurrency, report sent/duplicate/error counts, and fail on unexpected HTTP errors. After replay, independently deduplicate by event ID, verify each shipment’s returned event IDs and timestamp ordering, and compare current status with the highest logical lifecycle rank. Re-running the replay must not change event counts, timelines, or status.
 
 Use Rails’ built-in Minitest for request-level coverage of exact duplicate ingestion, conflicting duplicate IDs, out-of-order lifecycle events, and the separation between timeline time order and status rank. Also cover status filtering, including `undetermined`, and assert that contradictory terminal events are retained while current status is null. The demo is not complete until migrations, tests, a full replay, and documented curl examples pass against PostgreSQL.
 
@@ -50,6 +50,6 @@ Use Rails’ built-in Minitest for request-level coverage of exact duplicate ing
 
 If ingestion volume or carrier latency later requires asynchronous processing, keep the webhook thin: validate and durably record accepted input, then hand off internal processing through a transactional outbox or equivalent durable queue boundary. Workers process at least once, remain idempotent on `event_id`, retry transient failures with backoff, and route exhausted failures to a dead-letter queue for inspection/replay. This is an internal processing design, not publication of events to downstream consumers. Preserve the event log as truth and make any future status projection rebuildable. The initial demo deliberately avoids this infrastructure so its correctness path stays observable and easy to explain.
 
-## Known boundary
+## Fixture location
 
-The supplied CSV stays at the parent workspace’s `data/carrier_events.csv`, not inside this app repository. The replay script should support an explicit CSV path; packaging or relocating the fixture is deferred by request.
+The supplied CSV is included at `data/carrier_events.csv` in the repository root. The replay script uses this file by default and accepts an explicit path override for other local fixtures.

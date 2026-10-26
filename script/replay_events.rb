@@ -17,7 +17,7 @@ STATUS_RANK = {
 }.freeze
 
 options = {
-  csv: ENV.fetch("CSV_PATH", File.expand_path("../../../data/carrier_events.csv", __dir__)),
+  csv: ENV.fetch("CSV_PATH", File.expand_path("../data/carrier_events.csv", __dir__)),
   base_url: ENV.fetch("BASE_URL", "http://localhost:3000"),
   concurrency: 8
 }

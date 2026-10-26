@@ -6,14 +6,13 @@ A small Ruby on Rails API backed by PostgreSQL. It accepts carrier events idempo
 
 - Ruby 4.0.9 (see `.ruby-version`)
 - Bundler 4.x
-- PostgreSQL reachable by the URLs in `.env`
+- PostgreSQL available for development and test environments
 
 ## Run the demo
 
-From the app directory:
+From the repository root:
 
 ```sh
-cd apps/shipment-event-service
 # Create a local-only environment file if you do not already have one.
 test -f .env || cp .env.example .env
 # Edit .env with the PostgreSQL credentials for this machine.
@@ -25,25 +24,25 @@ bin/rails db:prepare
 bin/rails server -p 3000
 ```
 
-The server listens at `http://localhost:3000`. `.env` is ignored by Git. Rails does not load `.env` by itself; the `source` commands above export its variables to the process. `DATABASE_URL` must point to the local `shipment_event` development database; `TEST_DATABASE_URL` must point to the separate `shipment_event_test` database. The `.env.example` shows both URLs; if `.env` already existed, copy its `TEST_DATABASE_URL` line into it.
+The server listens at `http://localhost:3000`. `.env` is ignored by Git. Rails does not load `.env` by itself; the `source` commands above export its development `DATABASE_URL`. Tests use a separate ignored `.env.test` file with its own `DATABASE_URL`, so the test suite cannot accidentally target the development database. Copy `.env.test.example` to `.env.test` and edit its credentials if needed.
 
-In another terminal, source the same `.env` and run the test suite against its separate database:
+In another terminal, source `.env.test` and run the test suite against its separate database:
 
 ```sh
-cd apps/shipment-event-service
+test -f .env.test || cp .env.test.example .env.test
 set -a
-. ./.env
+. ./.env.test
 set +a
-RAILS_ENV=test DATABASE_URL="$TEST_DATABASE_URL" bin/rails db:prepare
-RAILS_ENV=test DATABASE_URL="$TEST_DATABASE_URL" bin/rails test
+RAILS_ENV=test bin/rails db:prepare
+RAILS_ENV=test bin/rails test
 ```
 
 ## Replay the supplied CSV
 
-The provided fixture is intentionally outside this nested Git repository at `../../data/carrier_events.csv`. From the app directory:
+The fixture is included in this repository at `data/carrier_events.csv`. From the repository root:
 
 ```sh
-CSV_PATH=../../data/carrier_events.csv ruby script/replay_events.rb --concurrency 8
+CSV_PATH=data/carrier_events.csv ruby script/replay_events.rb --concurrency 8
 ```
 
 The replay sends each CSV row to the webhook, including repeated IDs, and reports request outcomes. After it completes, inspect the timeline and status through the API. Re-running the replay should not add duplicate event rows or change results.
@@ -71,6 +70,10 @@ curl -s 'http://localhost:3000/shipments?status=delivered'
 curl -s 'http://localhost:3000/shipments?status=undetermined'
 ```
 
+## Development approach
+
+This project uses a document-first, interface-first, test-driven loop: domain invariants and trade-offs live in the technical design and ADR; OpenAPI specifies the HTTP contract before controller behavior; Minitest integration tests capture the observable correctness rules; and replay validates the contract against the full fixture. This makes decisions reviewable and surfaces mismatches early.
+
 The endpoint contract is in [`docs/openapi.yaml`](docs/openapi.yaml); design choices and the Mermaid ER diagram are in [`docs/technical-design.md`](docs/technical-design.md). The required trade-off and future async design note are in [`docs/adr/0001-storage-idempotency-and-query-model.md`](docs/adr/0001-storage-idempotency-and-query-model.md).
 
 ## Design decisions
@@ -87,9 +90,10 @@ The endpoint contract is in [`docs/openapi.yaml`](docs/openapi.yaml); design cho
 
 1. Validate lifecycle and terminal-conflict rules with the carrier/product owner, including a remediation path for undetermined shipments.
 2. Add metrics for duplicate deliveries, payload mismatches, and undetermined statuses; retain structured request logs and replay summaries.
-3. Measure query plans with larger realistic histories before adding a composite timeline index, status projection, or pagination.
+3. When `shipment_events` reaches millions of rows, add bounded keyset pagination to timelines using `(event_timestamp, event_id)` as the stable cursor and ordering key; include the event ID so equal timestamps paginate deterministically. Measure the query plan before adding `(shipment_id, event_timestamp, event_id)`, and assess status projection and shipment-list pagination separately.
 4. For multi-carrier or multi-tenant use, scope event identity and shipment references to the carrier/account and add authorization at the service boundary.
 5. If ingestion needs asynchronous processing, design an internal durable queue/outbox and idempotent workers; downstream event publication remains a separate requirement.
+6. Add an optional, lightweight pre-commit check for RuboCop and fast tests once the team agrees on a low-friction workflow; keep CI as the authoritative check.
 
 ## AI-usage note
 
