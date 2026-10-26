@@ -1,0 +1,22 @@
+default: &default
+  adapter: postgresql
+  encoding: unicode
+  host: <%= ENV.fetch("PGHOST", "127.0.0.1") %>
+  port: <%= ENV.fetch("PGPORT", 5432) %>
+  username: <%= ENV.fetch("PGUSER", "postgres") %>
+  password: <%= ENV.fetch("PGPASSWORD", "") %>
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS", 5) %>
+
+development:
+  <<: *default
+  database: shipment_event
+
+test:
+  <<: *default
+  database: shipment_event_test
+
+production:
+  <<: *default
+  database: <%= ENV.fetch("DATABASE_NAME", "shipment_event_production") %>
+  username: <%= ENV.fetch("DATABASE_USERNAME", "shipment_event") %>
+  password: <%= ENV.fetch("DATABASE_PASSWORD", "") %>

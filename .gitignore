@@ -1,0 +1,33 @@
+# Bundler and local dependency installs
+/.bundle/
+/vendor/bundle/
+/vendor/ruby/
+
+# Rails generated files
+/log/*
+!/log/.keep
+/tmp/*
+!/tmp/.keep
+/storage/*
+!/storage/.keep
+/config/master.key
+/config/credentials/*.key
+/public/assets/
+/public/packs/
+/public/packs-test/
+/coverage/
+/.byebug_history
+
+# Test output
+/test/tmp/
+/test/**/*.rbc
+
+# Local environment and editor files
+.env
+.env.*
+!.env.example
+*.swp
+*.swo
+.DS_Store
+.idea/
+.vscode/
