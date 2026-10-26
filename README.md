@@ -4,11 +4,29 @@ A small Ruby on Rails API backed by PostgreSQL. It accepts carrier events idempo
 
 ## Requirements
 
-- Ruby 4.0.9 (see `.ruby-version`)
-- Bundler 4.x
-- PostgreSQL available for development and test environments
+- Docker Desktop or Docker Engine with Docker Compose v2 for the containerized demo
+- Ruby 4.0.9, Bundler 4.x, and PostgreSQL for running Rails directly on the host
 
-## Run the demo
+## Run with Docker Compose
+
+From the repository root, build the Rails image and start the API plus its private PostgreSQL 16 container:
+
+```sh
+docker compose build
+docker compose up
+```
+
+For a single build-and-start command, use `docker compose up --build`. The API is available at `http://localhost:3000`; PostgreSQL is reachable only on the Compose network, so it will not conflict with a host database on port 5432. The demo database uses a named volume and keeps its data across `docker compose down`. Compose binds the API to loopback and uses demo-only credentials; do not expose this configuration as a production deployment.
+
+In another terminal, replay the bundled fixture from inside the running service container:
+
+```sh
+docker compose exec -e BASE_URL=http://127.0.0.1:3000 web ruby script/replay_events.rb --concurrency 8
+```
+
+Stop the containers with `docker compose down`. To also delete the persisted demo database, use `docker compose down -v` (this removes the Compose volume and its data).
+
+## Run locally without Docker
 
 From the repository root:
 
