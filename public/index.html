@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f4f7fb">
+    <title>Shipment Events</title>
+    <link rel="stylesheet" href="/app.css">
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="brand" href="/" aria-label="Shipment Events home">
+          <span class="brand-mark" aria-hidden="true">SE</span>
+          <span class="brand-copy">
+            <span class="brand-overline">Shipment Event Service</span>
+            <span class="brand-name">Operations</span>
+          </span>
+        </a>
+        <span class="environment-tag"><span class="environment-dot" aria-hidden="true"></span>Read-only view</span>
+      </div>
+    </header>
+
+    <main class="page-shell">
+      <section class="page-intro" aria-labelledby="page-title">
+        <div>
+          <p class="eyebrow">Carrier tracking</p>
+          <h1 id="page-title">Shipment events</h1>
+          <p class="intro-copy">Browse the recorded event history across shipments.</p>
+        </div>
+        <div class="intro-note"><span class="note-icon" aria-hidden="true">i</span><span>Event status reflects an individual carrier event, not the shipment's derived current status.</span></div>
+      </section>
+
+      <section class="filter-panel" aria-labelledby="filter-heading">
+        <div class="filter-heading-row">
+          <div>
+            <h2 id="filter-heading">Filter events</h2>
+            <p class="section-subtitle">Combine a shipment reference and event status to narrow the results.</p>
+          </div>
+          <button id="clear-filters" class="button button-secondary" type="button" disabled>Clear filters</button>
+        </div>
+        <div class="filter-grid" role="search">
+          <div class="field field-reference">
+            <label for="shipment-reference">Shipment reference</label>
+            <div class="input-wrap">
+              <span class="search-icon" aria-hidden="true"></span>
+              <input id="shipment-reference" name="shipment_reference" type="search" placeholder="Search by partial or full reference" autocomplete="off" spellcheck="false" aria-describedby="reference-help">
+            </div>
+            <p id="reference-help" class="field-help">Case-insensitive partial match</p>
+          </div>
+          <div class="field">
+            <label for="event-status">Event status</label>
+            <select id="event-status" name="status">
+              <option value="">All statuses</option>
+              <option value="created">Created</option>
+              <option value="picked_up">Picked up</option>
+              <option value="in_transit">In transit</option>
+              <option value="delivered">Delivered</option>
+              <option value="failed">Failed</option>
+            </select>
+            <p class="field-help">Filters each event row</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="events-panel" aria-labelledby="events-heading">
+        <div class="events-toolbar">
+          <div>
+            <h2 id="events-heading">Event history</h2>
+            <p id="results-summary" class="results-summary" role="status" aria-live="polite">Loading shipment events…</p>
+          </div>
+          <button id="retry-load" class="button button-secondary retry-button" type="button" hidden>Retry</button>
+        </div>
+        <div id="error-message" class="error-message" role="alert" hidden></div>
+        <div class="table-scroll" tabindex="0" aria-label="Scrollable shipment events table">
+          <table id="events-table" aria-busy="true">
+            <caption class="visually-hidden">Carrier shipment events, newest first</caption>
+            <thead>
+              <tr>
+                <th scope="col">Shipment reference</th>
+                <th scope="col">Status</th>
+                <th scope="col">Event timestamp</th>
+                <th scope="col">Event ID</th>
+              </tr>
+            </thead>
+            <tbody id="events-body">
+              <tr><td class="table-state" colspan="4">Loading shipment events…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <noscript><p class="noscript-message">JavaScript is required to load and filter shipment events.</p></noscript>
+      <footer class="page-footer">Shipment Event Service <span aria-hidden="true">·</span> Carrier event history</footer>
+    </main>
+  </body>
+</html>

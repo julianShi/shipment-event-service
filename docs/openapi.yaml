@@ -41,6 +41,42 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /shipment_events:
+    get:
+      summary: List events with event-level filters
+      operationId: listShipmentEvents
+      parameters:
+        - name: shipment_reference
+          in: query
+          required: false
+          description: Case-insensitive substring match on the shipment reference.
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          description: Filter by the status of each event, not derived shipment status.
+          schema:
+            $ref: '#/components/schemas/EventStatus'
+      responses:
+        '200':
+          description: Matching events ordered descending by event_timestamp, then event_id.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [events]
+                properties:
+                  events:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ShipmentEvent'
+        '422':
+          description: Unsupported event-status filter.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /shipments/{shipment_reference}:
     get:
       summary: Get a shipment timeline and derived current status

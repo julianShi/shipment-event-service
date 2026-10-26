@@ -1,6 +1,6 @@
 # Shipment Event Service
 
-A small Ruby on Rails API backed by PostgreSQL. It accepts carrier events idempotently, preserves event history, and returns shipment timelines plus current status derived from logical lifecycle order.
+A small Ruby on Rails service backed by PostgreSQL. It accepts carrier events idempotently, preserves event history, returns shipment timelines and derived current status, and includes a read-only table UI for browsing events.
 
 ## Requirements
 
@@ -16,7 +16,7 @@ docker compose build
 docker compose up
 ```
 
-For a single build-and-start command, use `docker compose up --build`. The API is available at `http://localhost:3000`; PostgreSQL is reachable only on the Compose network, so it will not conflict with a host database on port 5432. The demo database uses a named volume and keeps its data across `docker compose down`. Compose binds the API to loopback and uses demo-only credentials; do not expose this configuration as a production deployment.
+For a single build-and-start command, use `docker compose up --build`. Open `http://localhost:3000/` for the shipment-events table; the API is available on the same origin. PostgreSQL is reachable only on the Compose network, so it will not conflict with a host database on port 5432. The demo database uses a named volume and keeps its data across `docker compose down`. Compose binds the API to loopback and uses demo-only credentials; do not expose this configuration as a production deployment.
 
 In another terminal, replay the bundled fixture from inside the running service container:
 
@@ -42,7 +42,7 @@ bin/rails db:prepare
 bin/rails server -p 3000
 ```
 
-The server listens at `http://localhost:3000`. `.env` is ignored by Git. Rails does not load `.env` by itself; the `source` commands above export its development `DATABASE_URL`. Tests use a separate ignored `.env.test` file with its own `DATABASE_URL`, so the test suite cannot accidentally target the development database. Copy `.env.test.example` to `.env.test` and edit its credentials if needed.
+The server listens at `http://localhost:3000`; open that URL in a browser to use the shipment-events table. `.env` is ignored by Git. Rails does not load `.env` by itself; the `source` commands above export its development `DATABASE_URL`. Tests use a separate ignored `.env.test` file with its own `DATABASE_URL`, so the test suite cannot accidentally target the development database. Copy `.env.test.example` to `.env.test` and edit its credentials if needed.
 
 In another terminal, source `.env.test` and run the test suite against its separate database:
 
@@ -81,6 +81,14 @@ Read one shipment’s timeline and current status:
 curl -s http://localhost:3000/shipments/TV-200070
 ```
 
+List event rows matching both a partial shipment reference and an event-level status:
+
+```sh
+curl -s 'http://localhost:3000/shipment_events?shipment_reference=TV-200070&status=in_transit'
+```
+
+The event table at `http://localhost:3000/` uses this collection endpoint. Its status filter applies to each event row; it is distinct from `GET /shipments?status=...`, which filters by a shipment's derived current status.
+
 List shipments with a known current status, or find shipments whose terminal events conflict:
 
 ```sh
@@ -92,16 +100,17 @@ curl -s 'http://localhost:3000/shipments?status=undetermined'
 
 This project uses a document-first, interface-first, test-driven loop: domain invariants and trade-offs live in the technical design and ADR; OpenAPI specifies the HTTP contract before controller behavior; Minitest integration tests capture the observable correctness rules; and replay validates the contract against the full fixture. This makes decisions reviewable and surfaces mismatches early.
 
-The endpoint contract is in [`docs/openapi.yaml`](docs/openapi.yaml); design choices and the Mermaid ER diagram are in [`docs/technical-design.md`](docs/technical-design.md). The required trade-off and future async design note are in [`docs/adr/0001-storage-idempotency-and-query-model.md`](docs/adr/0001-storage-idempotency-and-query-model.md).
+The endpoint contract is in [`docs/openapi.yaml`](docs/openapi.yaml); service decisions and the Mermaid ER diagram are in [`docs/technical-design.md`](docs/technical-design.md); the table and filter behavior are in [`docs/ui-design.md`](docs/ui-design.md). The required trade-off and future async design note are in [`docs/adr/0001-storage-idempotency-and-query-model.md`](docs/adr/0001-storage-idempotency-and-query-model.md).
 
 ## Design decisions
 
 - **Two tables:** `shipments` represents the shipment identity and uniquely indexes `shipment_reference`; `shipment_events` is the immutable event log. `event_id` (UUID) is the event primary key and idempotency key.
 - **Idempotency:** exact replays are successful no-ops. A repeated ID with changed immutable fields returns `409 Conflict`; existing event data is never overwritten.
 - **Current status:** derive the highest logical lifecycle rank (`created < picked_up < in_transit < delivered/failed`), independently of event arrival time. Forward skips are allowed. If both terminal outcomes exist, retain both events and return `current_status: null` with `status_resolution: "undetermined"`.
+- **UI scope:** the table is for shipment events, not shipments; each row's `Status` is the event status. It must not be confused with `current_status`, which is a derived shipment-level value.
 - **Timeline:** order in PostgreSQL by `event_timestamp, event_id`; this is chronological history, separate from logical current status.
 - **Indexes:** primary key on `event_id`, unique index on `shipment_reference`, and an index on event `shipment_id` for timeline lookup. With fewer than five events per shipment in this fixture, do not index `event_timestamp`; sort the small result set in SQL. Revisit with `EXPLAIN ANALYZE` as volume grows.
-- **Scope:** synchronous HTTP ingestion and query APIs only. No authentication, frontend, Sidekiq, deployment, or downstream event publishing.
+- **Scope:** synchronous HTTP ingestion and query APIs plus a read-only local table UI. No authentication, Sidekiq, deployment, or downstream event publishing.
 - **Tooling:** Rails API mode, PostgreSQL, and built-in Minitest keep the demo small and avoid extra framework dependencies.
 
 ## What I would do next
@@ -115,4 +124,4 @@ The endpoint contract is in [`docs/openapi.yaml`](docs/openapi.yaml); design cho
 
 ## AI-usage note
 
-Manus AI assisted with the initial Rails API scaffold, fixture analysis, and drafts of the technical design, API contract, ADR, README, and tests. The candidate reviewed the work and made the domain decisions, including logical status ordering, terminal-conflict handling, index scope, and the two-table model. An early AI assumption treated the newest `event_timestamp` as current status; review caught that status must follow logical lifecycle order while the timeline remains timestamp-ordered, and the design was corrected. No business rule was accepted without review.
+Manus AI assisted with the initial Rails API scaffold, fixture analysis, technical design, API contract, ADR, README, tests, UI design, event-list endpoint, and vanilla HTML/CSS/JavaScript frontend. The candidate made the core domain decisions, including logical status ordering, terminal-conflict handling, index scope, the two-table model, and the event-level filter semantics, and approved the UI design direction before implementation. The newly added UI/API changes are locally tested and remain subject to candidate review before release. An early AI assumption treated the newest `event_timestamp` as current status; review caught that status must follow logical lifecycle order while the timeline remains timestamp-ordered, and the design was corrected. No business rule was accepted without review.

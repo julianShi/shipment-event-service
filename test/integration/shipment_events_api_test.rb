@@ -159,6 +159,95 @@ class ShipmentEventsApiTest < ActionDispatch::IntegrationTest
                  response_json.fetch("events").map { |event| event.fetch("event_id") }
   end
 
+  test "event collection combines partial reference and event status filters" do
+    post_event(event_payload(
+      event_id: "00000000-0000-0000-0000-000000000021",
+      shipment_reference: "TV-UI-ALPHA",
+      status: "created",
+      event_timestamp: "2026-07-01T10:00:00Z"
+    ))
+    assert_response :created
+
+    post_event(event_payload(
+      event_id: "00000000-0000-0000-0000-000000000022",
+      shipment_reference: "TV-UI-ALPHA",
+      status: "in_transit",
+      event_timestamp: "2026-07-02T10:00:00Z"
+    ))
+    assert_response :created
+
+    post_event(event_payload(
+      event_id: "00000000-0000-0000-0000-000000000023",
+      shipment_reference: "TV-UI-BETA",
+      status: "created",
+      event_timestamp: "2026-07-03T10:00:00Z"
+    ))
+    assert_response :created
+
+    get "/shipments/TV-UI-ALPHA"
+    assert_response :ok
+    assert_equal "in_transit", response_json.fetch("current_status")
+
+    get "/shipment_events", params: { shipment_reference: "  ui-alpha  ", status: "created" }
+    assert_response :ok
+    events = response_json.fetch("events")
+    assert_equal 1, events.length
+    assert_equal "00000000-0000-0000-0000-000000000021", events.first.fetch("event_id")
+    assert_equal "created", events.first.fetch("status")
+
+    get "/shipment_events", params: { status: "created" }
+    assert_response :ok
+    assert_equal [ "TV-UI-BETA", "TV-UI-ALPHA" ],
+                 response_json.fetch("events").map { |event| event.fetch("shipment_reference") }
+  end
+
+  test "event collection sorts newest first with an ID tie-breaker and rejects undetermined status" do
+    post_event(event_payload(
+      event_id: "00000000-0000-0000-0000-000000000031",
+      shipment_reference: "TV-UI-TIES",
+      status: "created",
+      event_timestamp: "2026-07-01T10:00:00Z"
+    ))
+    assert_response :created
+
+    post_event(event_payload(
+      event_id: "00000000-0000-0000-0000-000000000032",
+      shipment_reference: "TV-UI-TIES",
+      status: "picked_up",
+      event_timestamp: "2026-07-02T10:00:00Z"
+    ))
+    assert_response :created
+
+    post_event(event_payload(
+      event_id: "00000000-0000-0000-0000-000000000033",
+      shipment_reference: "TV-UI-TIES",
+      status: "in_transit",
+      event_timestamp: "2026-07-02T10:00:00Z"
+    ))
+    assert_response :created
+
+    get "/shipment_events", params: { shipment_reference: "TV-UI-TIES" }
+    assert_response :ok
+    assert_equal [
+      "00000000-0000-0000-0000-000000000033",
+      "00000000-0000-0000-0000-000000000032",
+      "00000000-0000-0000-0000-000000000031"
+    ], response_json.fetch("events").map { |event| event.fetch("event_id") }
+
+    get "/shipment_events", params: { status: "undetermined" }
+    assert_response :unprocessable_entity
+    assert_equal "invalid_status_filter", response_json.fetch("error")
+  end
+
+  test "root serves the shipment events user interface" do
+    get "/"
+
+    assert_response :success
+    assert_includes response.media_type, "text/html"
+    assert_includes response.body, "Shipment events"
+    assert_includes response.body, 'id="shipment-reference"'
+  end
+
   private
 
   def post_event(payload)

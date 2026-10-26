@@ -1,5 +1,6 @@
 Rails.application.routes.draw do
   post "/webhooks/carrier_events", to: "carrier_events#create"
+  get "/shipment_events", to: "shipment_events#index"
   get "/shipments", to: "shipments#index"
   get "/shipments/:shipment_reference", to: "shipments#show"
 
