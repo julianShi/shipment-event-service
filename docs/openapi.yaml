@@ -1,0 +1,164 @@
+openapi: 3.0.3
+info:
+  title: Shipment Event Service API
+  version: 1.0.0
+  description: Synchronous carrier-event ingestion and shipment timeline/status queries.
+servers:
+  - url: http://localhost:3000
+paths:
+  /webhooks/carrier_events:
+    post:
+      summary: Ingest one carrier event
+      operationId: ingestCarrierEvent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CarrierEventInput'
+      responses:
+        '201':
+          description: New event stored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestResponse'
+        '200':
+          description: Exact duplicate; successful no-op
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestResponse'
+        '409':
+          description: event_id already exists with different immutable fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Invalid event payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /shipments/{shipment_reference}:
+    get:
+      summary: Get a shipment timeline and derived current status
+      operationId: getShipment
+      parameters:
+        - name: shipment_reference
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Shipment and ordered event history
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShipmentTimeline'
+        '404':
+          description: Shipment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /shipments:
+    get:
+      summary: List shipments, optionally filtered by derived status
+      operationId: listShipments
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [created, picked_up, in_transit, delivered, failed, undetermined]
+      responses:
+        '200':
+          description: Matching shipments
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [shipments]
+                properties:
+                  shipments:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ShipmentSummary'
+        '422':
+          description: Unsupported status filter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  schemas:
+    EventStatus:
+      type: string
+      enum: [created, picked_up, in_transit, delivered, failed]
+    CarrierEventInput:
+      type: object
+      additionalProperties: false
+      required: [event_id, shipment_reference, status, event_timestamp]
+      properties:
+        event_id:
+          type: string
+          format: uuid
+        shipment_reference:
+          type: string
+          minLength: 1
+        status:
+          $ref: '#/components/schemas/EventStatus'
+        event_timestamp:
+          type: string
+          format: date-time
+    ShipmentEvent:
+      allOf:
+        - $ref: '#/components/schemas/CarrierEventInput'
+    ShipmentSummary:
+      type: object
+      required: [shipment_reference, current_status, status_resolution]
+      properties:
+        shipment_reference:
+          type: string
+        current_status:
+          type: string
+          nullable: true
+          enum: [created, picked_up, in_transit, delivered, failed]
+        status_resolution:
+          type: string
+          enum: [determined, undetermined]
+    ShipmentTimeline:
+      allOf:
+        - $ref: '#/components/schemas/ShipmentSummary'
+        - type: object
+          required: [events]
+          properties:
+            events:
+              type: array
+              description: Ordered by event_timestamp ascending, with event_id as tie-breaker.
+              items:
+                $ref: '#/components/schemas/ShipmentEvent'
+    IngestResponse:
+      type: object
+      required: [event_id, duplicate, shipment]
+      properties:
+        event_id:
+          type: string
+          format: uuid
+        duplicate:
+          type: boolean
+        shipment:
+          $ref: '#/components/schemas/ShipmentSummary'
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
