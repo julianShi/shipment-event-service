@@ -25,7 +25,7 @@ bin/rails db:prepare
 bin/rails server -p 3000
 ```
 
-The server listens at `http://localhost:3000`. `.env` is ignored by Git. Rails does not load `.env` by itself; the `source` commands above export its variables to the process. `DATABASE_URL` must point to the local `shipment_event` development database; `TEST_DATABASE_URL` must point to the separate `shipment_event_test` database. The `.env.example` shows both URLs.
+The server listens at `http://localhost:3000`. `.env` is ignored by Git. Rails does not load `.env` by itself; the `source` commands above export its variables to the process. `DATABASE_URL` must point to the local `shipment_event` development database; `TEST_DATABASE_URL` must point to the separate `shipment_event_test` database. The `.env.example` shows both URLs; if `.env` already existed, copy its `TEST_DATABASE_URL` line into it.
 
 In another terminal, source the same `.env` and run the test suite against its separate database:
 
